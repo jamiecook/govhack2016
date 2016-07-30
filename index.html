@@ -30,7 +30,7 @@
 </style>
 
 <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.js'></script>
-<script src='https://api.mapbox.com/mapbox.js/plugins/turf/v2.0.2/turf.min.js'></script>
+<script src="turf_SatJul302016.min.js" charset="utf-8"></script>
 <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.css' type='text/css' />
 
 <div id='map'></div>
@@ -61,6 +61,38 @@ map.addControl(geocoder);
 map.addControl(new mapboxgl.Navigation({position: 'top-left'}));
 
 map.on('load', function () {
+    var center = {
+      "type": "Feature",
+      "properties": {
+        "marker-color": "#0f0"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [144.96546591, -37.8186610515]
+      }
+    };
+    var radius = 5;
+    var steps = 10;
+    var units = 'kilometers';
+
+    var circle = turf.circle(center, radius, steps, units);
+
+    var result = {
+      "type": "FeatureCollection",
+      "features": [circle]
+    };
+
+    map.addSource('circle', {
+        type: 'geojson',
+        data: result
+    });
+
+    map.addLayer({
+        id: 'circle',
+        type: 'fill',
+        source: 'circle',
+    });
+
     map.addSource('geojson', {
         type: 'geojson',
         data: geojson
@@ -99,48 +131,13 @@ map.on('load', function () {
             }
         }
     });
-
-
-
-     
-
-    // // When a click event occurs near a place, open a popup at the location of
-    // // the feature, with description HTML from its properties.
-    // map.on('click', function (e) {
-    //     var features = map.queryRenderedFeatures(e.point, { layers: ['point'] });
-
-    //     if (!features.length) {
-    //         return;
-    //     }
-
-    //     var feature = features[0];
-
-    //     // Populate the popup and set its coordinates
-    //     // based on the feature found.
-    //     var popup = new mapboxgl.Popup()
-    //         .setLngLat(feature.geometry.coordinates)
-    //         .setHTML(feature.properties["Number of floors (above ground)"])
-    //         .addTo(map);
-
-    //     var coords = e.lngLat;
-
-    //     // Print the coordinates of where the point had
-    //     // finished being dragged to on the map.
-    //     coordinates.style.display = 'block';
-    //     coordinates.innerHTML = 'Longitude: ' + coords.lng + '<br />Latitude: ' + coords.lat;
-    // });
 });
 
 // Listen for the `geocoder.input` event that is triggered when a user
 // makes a selection and add a symbol that matches the result.
 geocoder.on('result', function(ev) {
-    console.log(ev);
-
     if (geojson.features.length > 0) geojson.features.pop();
     geojson.features.push(ev.result);
-
-    console.log(geojson)
-
     map.getSource('geojson').setData(geojson);
 
     coords = ev.result.geometry.coordinates
@@ -154,55 +151,16 @@ geocoder.on('result', function(ev) {
 map.on('click', function(e) {
     var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
 
-    // Remove the linestring from the group
-    // So we can redraw it based on the points collection
-    if (geojson.features.length > 0) geojson.features.pop();
-
     // If a feature was clicked, remove it from the map
     if (features.length) {
         var id = features[0].properties.id;
         geojson.features = geojson.features.filter(function(point) {
             return point.properties.id !== id;
         });
+        map.getSource('geojson').setData(geojson);
     } else {
-        var point = {
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [
-                    e.lngLat.lng,
-                    e.lngLat.lat
-                ]
-            },
-            "properties": {
-                "id": String(new Date().getTime())
-            }
-        };
-
-        geojson.features.push(point);
+        geocoder.query([e.lngLat.lng, e.lngLat.lat])
     }
-
-    // if (geojson.features.length > 1) {
-    //     linestring.geometry.coordinates = geojson.features.map(function(point) {
-    //         return point.geometry.coordinates;
-    //     });
-
-    //     geojson.features.push(linestring);
-
-    //     // Populate the distanceContainer with total distance
-    //     var value = document.createElement('pre');
-    //     value.textContent = 'Total distance: ' + turf.lineDistance(linestring).toLocaleString() + 'km';
-    //     distanceContainer.appendChild(value);
-    // }
-
-    var coords = e.lngLat;
-
-    // Print the coordinates of where the point had
-    // finished being dragged to on the map.
-    coordinates.style.display = 'block';
-    coordinates.innerHTML = 'Longitude: ' + coords.lng + '<br />Latitude: ' + coords.lat;
-
-    map.getSource('geojson').setData(geojson);
 });
 
 // Use the same approach as above to indicate that the symbols are clickable
