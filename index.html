@@ -29,12 +29,15 @@
 }
 </style>
 
+
+
 <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.js'></script>
 <script src="turf_SatJul302016.min.js" charset="utf-8"></script>
 <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.css' type='text/css' />
 
 <div id='map'></div>
 <pre id='coordinates' class='coordinates'></pre>
+<script src="buildings.geojson" type="text/javascript"></script>
 
 <script>
 mapboxgl.accessToken = 'pk.eyJ1IjoibGF1cmVuY2VuaWNvbCIsImEiOiJjaW8zdWNwaW8wMWN1dzNramw2ZGVwZDIxIn0.ypTc0f_ote92hBKe3BzKuw';
@@ -61,32 +64,14 @@ map.addControl(geocoder);
 map.addControl(new mapboxgl.Navigation({position: 'top-left'}));
 
 map.on('load', function () {
-    var center = {
-      "type": "Feature",
-      "properties": {
-        "marker-color": "#0f0"
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [144.96546591, -37.8186610515]
-      }
-    };
-    var radius = 5;
-    var steps = 10;
-    var units = 'kilometers';
-
-    var circle = turf.circle(center, radius, steps, units);
-
     var result = {
       "type": "FeatureCollection",
-      "features": [circle]
+      "features": []
     };
-
     map.addSource('circle', {
         type: 'geojson',
         data: result
     });
-
     map.addLayer({
         id: 'circle',
         type: 'fill',
@@ -109,15 +94,15 @@ map.on('load', function () {
         }
     });
 
-    map.addSource('melbourne-buildings', {
-        type: 'vector',
-        url: 'mapbox://laurencenicol.6m4w20qu'
+    map.addSource("melbourne-buildings", {
+        type: "geojson",
+        data: buildings
     });
+
     map.addLayer({
         "id": "melbourne-buildings",
         "type": "circle",
-        "source": "melbourne-buildings",
-        "source-layer": "Building_information_2015_1-9pomst",
+        "source": "melbourne-buildings",    
         'paint': {
             // make circles larger as the user zooms from z12 to z22
             'circle-radius': {
@@ -141,6 +126,33 @@ geocoder.on('result', function(ev) {
     map.getSource('geojson').setData(geojson);
 
     coords = ev.result.geometry.coordinates
+
+    var center = {
+      "type": "Feature",
+      "properties": {
+        "marker-color": "#0f0"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": coords
+      }
+    };
+
+    var radius = 0.100;
+    var steps = 20;
+    var units = 'kilometers';
+
+    var circle = turf.circle(center, radius, steps, units);
+
+    var circle_collection = {type: "FeatureCollection", features: [circle]}
+
+    map.getSource('circle').setData(circle);
+
+    console.log(buildings)
+    console.log(circle)
+    var points_within = turf.within(buildings, circle_collection)
+
+    console.log(points_within.features.length);
 
     // Print the coordinates of where the point had
     // finished being dragged to on the map.
