@@ -26,6 +26,7 @@
 <style>
 .important_number{
   color: rgb(205, 45, 45);
+  text-align: center;
 }
 .coordinates {
     background: rgba(179, 179, 179, 0.89);
@@ -34,12 +35,16 @@
     left: 10px;
     padding:5px 10px;
     margin: 0;
-    font-size: 20px;
+    font-size: 18px;
     border-radius: 20px;
-    border: 5px solid rgb(32, 119, 27);
+    border: 5px solid rgb(31, 31, 31);
     display: none;
-    width: 300px;
+    width: 325px;
 }
+pre > p {
+  margin: 3px;
+}
+
 </style>
 
 <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.js'></script>
@@ -170,7 +175,7 @@ geocoder.on('result', function(ev) {
                             '<p class="important_number">' + pedEstimate(features) + '</p>' +
                             '<p class="alignleft">Nearby floors of office space:</p>' +
                             '<p class="important_number">' + features[0] + '</p>' +
-                            '<br />Longitude: ' + coords[0] +
+                            'Longitude: ' + coords[0] +
                             '<br />Latitude: ' + coords[1];
 });
 
