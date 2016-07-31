@@ -62,6 +62,7 @@
     <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.21.0/mapbox-gl.js'></script>
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.21.0/mapbox-gl.css' rel='stylesheet' />
 
+<<<<<<< Updated upstream
 	</head>
 	<body>
 
@@ -144,5 +145,105 @@
 	<script src="js/main.js"></script>
 
 	</body>
+=======
+    drawCircle(centre, 0.1);
+
+    var features = extractFeatures(center)
+
+    // Print the coordinates of where the point had
+    // finished being dragged to on the map.
+    coordinates.style.display = 'block';
+    coordinates.innerHTML = '<p class="alignleft">Estimated Foot Traffic:</p>' +
+                            '<p class="important_number">' + pedEstimate(features) + '</p>' +
+                            '<p class="alignleft">Nearby floors of office space:</p>' +
+                            '<p class="important_number">' + features[0] + '</p>' +
+                            'Longitude: ' + coords[0] +
+                            '<br />Latitude: ' + coords[1];
+});
+
+function pedEstimate(features) {
+  return 100000000000
+}
+
+function drawCircle(centre) {
+  var circle = getCircle(center, 0.1);
+  map.getSource('circle').setData(circle);
+
+}
+
+function getCircle(center, radius) {
+  var steps = 20;
+  var units = 'kilometers';
+  var circle = turf.circle(center, radius, steps, units);
+  return circle;
+}
+
+function getBuildingsNear(center, radius) {
+  var circle_collection = {type: "FeatureCollection", features: [getCircle(center, radius)]}
+  var points_within = turf.within(buildings, circle_collection)
+
+  return points_within;
+}
+
+function extractFeatures(point) {
+  var featureVector_100 = featureExtract(getBuildingsNear(point, 0.1));
+  var featureVector_200 = featureExtract(getBuildingsNear(point, 0.2));
+  var featureVector_300 = featureExtract(getBuildingsNear(point, 0.3));
+
+  featureVector_100.unshift(point.properties.weekday_count);
+  var featureVector = featureVector_100 + "," + featureVector_200 + "," + featureVector_300;
+  console.log(featureVector);
+  return featureVector;
+}
+
+function doFeatureExtraction() {
+  featureVectors = ped_counts.features.map(extractFeatures)
+  return featureVectors;
+}
+
+function getFloors(building) {
+  return building.properties['Number of floors (above ground)'];
+}
+
+var buildingTypes = ["Office", 'Retail - Shop', 'Student Accommodation',
+                     'Residential Apartment', 'Transport']
+function featureExtract(buildingsNear) {
+  var featureVector = buildingTypes.map(function(buildingType) {
+    var matched_buildings = buildingsNear.features.filter(function(b) {
+      return b.properties['Predominant space use'] == buildingType
+    });
+    return matched_buildings.map(getFloors).reduce((a,b) => a + b, 0.0)
+  });
+  return featureVector;
+}
+
+map.on('click', function(e) {
+    var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
+
+    // If a feature was clicked, remove it from the map
+    if (features.length) {
+        var id = features[0].properties.id;
+        geojson.features = geojson.features.filter(function(point) {
+            return point.properties.id !== id;
+        });
+        result.features = [];
+        map.getSource('geojson').setData(geojson);
+        map.getSource('circle').setData(result);
+    } else {
+        geocoder.query([e.lngLat.lng, e.lngLat.lat])
+    }
+});
+
+// Use the same approach as above to indicate that the symbols are clickable
+// by changing the cursor style to 'pointer'.
+map.on('mousemove', function (e) {
+    var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
+    map.getCanvas().style.cursor = (features.length) ? 'pointer' : 'crosshair';
+});
+
+</script>
+
+</body>
+>>>>>>> Stashed changes
 </html>
 
