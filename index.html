@@ -24,6 +24,45 @@
 <body>
 
 <style>
+  #menu {
+      background: #fff;
+      position: absolute;
+      z-index: 1;
+      top: 10px;
+      right: 10px;
+      border-radius: 3px;
+      width: 120px;
+      border: 1px solid rgba(0,0,0,0.4);
+      font-family: 'Open Sans', sans-serif;
+  }
+  #menu a {
+      font-size: 13px;
+      color: #404040;
+      display: block;
+      margin: 0;
+      padding: 0;
+      padding: 10px;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0,0,0,0.25);
+      text-align: center;
+  }
+  #menu a:last-child {
+      border: none;
+  }
+  #menu a:hover {
+      background-color: #f8f8f8;
+      color: #404040;
+  }
+  #menu a.active {
+      background-color: #3887be;
+      color: #ffffff;
+  }
+  #menu a.active:hover {
+      background: #3074a4;
+  }
+</style>
+
+<style>
 .important_number{
   color: rgb(205, 45, 45);
   text-align: center;
@@ -40,6 +79,7 @@
     border: 5px solid rgb(31, 31, 31);
     display: none;
     width: 325px;
+    font-family: Verdana, Geneva, sans-serif;
 }
 pre > p {
   margin: 3px;
@@ -47,18 +87,38 @@ pre > p {
 
 </style>
 
+<script src='https://code.jquery.com/jquery-1.11.0.min.js'></script>
 <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.js'></script>
 <script src="turf_SatJul302016.min.js" charset="utf-8"></script>
 <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.css' type='text/css' />
 
+<nav id="menu"></nav>
 <div id='map'></div>
 <div id='geocoder-container'></div>
 <pre id='coordinates' class='coordinates'></pre>
 <script src="buildings.geojson" type="text/javascript"></script>
+<script src="clueb.geojson" type="text/javascript"></script>
 <script src="ped_counts.geojson" type="text/javascript"></script>
 
 <script>
+// Mapbox access id's
 mapboxgl.accessToken = 'pk.eyJ1IjoibGF1cmVuY2VuaWNvbCIsImEiOiJjaW8zdWNwaW8wMWN1dzNramw2ZGVwZDIxIn0.ypTc0f_ote92hBKe3BzKuw';
+
+// Foursquare access id's
+var CLIENT_ID = 'SIHWPNAB1YHPCXYMHXK4ZHSF1DFOQ4H5EBU4QLWE02M0LNFT';
+var CLIENT_SECRET = 'GGTWT1HFMS41GEEEUQAY2BLIVYDCPBPCWHEPZPULFQMXKRAE';
+
+// https://developer.foursquare.com/start/search
+var API_ENDPOINT_SEARCH =  'https://api.foursquare.com/v2/venues/search' +
+                            '?client_id=CLIENT_ID' +
+                            '&client_secret=CLIENT_SECRET' +
+                            '&v=20130815' +
+                            '&categoryId=4d4b7105d754a06374d81259' +
+                            '&intent=browse' +
+                            '&ll=LL' +
+                            '&limit=50' +
+                            '&radius=200' +
+                            '&callback=?';
 
 var coordinates = document.getElementById('coordinates');
 
@@ -72,13 +132,18 @@ var result = {
   "features": []
 };
 
+var fourSquare = {
+  "type": "FeatureCollection",
+  "features": []
+};
+
 var melbourne_location = [144.96546591, -37.8186610515]
 
 var map = new mapboxgl.Map({
     container: 'map', // container id
     style: 'mapbox://styles/mapbox/dark-v8', //stylesheet location
     center: melbourne_location, // starting position
-    zoom: 12 // starting zoom
+    zoom: 14 // starting zoom
 });
 
 var geocoder = new mapboxgl.Geocoder({
@@ -91,6 +156,80 @@ map.addControl(geocoder);
 map.addControl(new mapboxgl.Navigation({position: 'top-left'}));
 
 map.on('load', function () {
+    map.addSource("clueb", {
+      type: 'geojson',
+      data: clueb
+    })
+
+    map.addLayer({
+      "id": "employment",
+      "type": "fill",
+      "source": "clueb",
+      "paint": {
+        'fill-antialias': true,
+        'fill-opacity': 0.2,
+        'fill-color': {
+                property: 'employment',
+                stops: [
+                    [0, '#F2F12D'],
+                    [5000, '#723122']
+                ]
+            },
+        'fill-outline-color': 'rgb(19, 19, 19)'
+      }
+    });
+
+    map.addLayer({
+      "id": "floor_space",
+      "type": "fill",
+      "source": "clueb",
+      "paint": {
+        'fill-antialias': true,
+        'fill-opacity': 0.2,
+        'fill-color': {
+                property: 'floor_sqm',
+                stops: [
+                    [0, '#F2F12D'],
+                    [100000, '#723122']
+                ]
+            },
+        'fill-outline-color': 'rgb(19, 19, 19)'
+      }
+    });
+
+    map.addLayer({
+      "id": "establishments",
+      "type": "fill",
+      "source": "clueb",
+      "paint": {
+        'fill-antialias': true,
+        'fill-opacity': 0.2,
+        'fill-color': {
+                property: 'estabs',
+                stops: [
+                    [0, '#F2F12D'],
+                    [100, '#723122']
+                ]
+            },
+        'fill-outline-color': 'rgb(19, 19, 19)'
+      }
+    });
+
+    map.addSource('fourSquare', {
+      type: 'geojson',
+      data: fourSquare
+    });
+
+    map.addLayer({
+      id: "fourSquare_places",
+      type: 'symbol',
+      source: 'fourSquare',
+      layout: {
+        'icon-allow-overlap': true,
+        'icon-image': 'restaurant-15'
+      }
+    })
+
     map.addSource('circle', {
         type: 'geojson',
         data: result
@@ -122,6 +261,7 @@ map.on('load', function () {
         }
     });
 
+    // melbourne buildings layer which will be hidden
     map.addSource("melbourne-buildings", {
         type: "geojson",
         data: buildings
@@ -131,6 +271,9 @@ map.on('load', function () {
         "id": "melbourne-buildings",
         "type": "circle",
         "source": "melbourne-buildings",
+        "layout": {
+          visibility: "none"
+        },
         'paint': {
             // make circles larger as the user zooms from z12 to z22
             'circle-radius': {
@@ -144,7 +287,36 @@ map.on('load', function () {
             }
         }
     });
+
+    addLayer('Employment', 'employment', '')
+    addLayer('Floor Space', 'floor_space', '')
+    addLayer('Establisments', 'establishments', '')
+
+    map.setLayoutProperty('employment', 'visibility', 'none');
+    map.setLayoutProperty('floor_space', 'visibility', 'none');
+    map.setLayoutProperty('establishments', 'visibility', 'none');
 });
+
+function addLayer(name, id, visible) {
+    var link = document.createElement('a');
+    link.href = '#';
+    link.className = visible;
+    link.textContent = name;
+    link.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var visibility = map.getLayoutProperty(id, 'visibility');
+        if (visibility === 'visible') {
+            map.setLayoutProperty(id, 'visibility', 'none');
+            this.className = '';
+        } else {
+            this.className = 'active';
+            map.setLayoutProperty(id, 'visibility', 'visible');
+        }
+    };
+    var layers = document.getElementById('menu');
+    layers.appendChild(link);
+}
 
 // Listen for the `geocoder.input` event that is triggered when a user
 // makes a selection and add a symbol that matches the result.
@@ -154,6 +326,8 @@ geocoder.on('result', function(ev) {
     map.getSource('geojson').setData(geojson);
 
     coords = ev.result.geometry.coordinates
+
+    countFoursquare(coords[1], coords[0]);
 
     var center = {
       "type": "Feature",
@@ -168,19 +342,25 @@ geocoder.on('result', function(ev) {
 
     var features = extractFeatures(center)
 
+    console.log(features)
+
     // Print the coordinates of where the point had
     // finished being dragged to on the map.
     coordinates.style.display = 'block';
-    coordinates.innerHTML = '<p class="alignleft">Estimated Foot Traffic:</p>' +
-                            '<p class="important_number">' + pedEstimate(features) + '</p>' +
-                            '<p class="alignleft">Nearby floors of office space:</p>' +
-                            '<p class="important_number">' + features[0] + '</p>' +
-                            'Longitude: ' + coords[0] +
-                            '<br />Latitude: ' + coords[1];
+    coordinates.innerHTML = '<p class="alignleft">Lunch hour PedEstimate:</p>' +
+                            '<p class="important_number">' + pedEstimate(features) + ' potential lunch customers</p>' +
+                            '<p class="alignleft">Nearby Office Space:</p>' +
+                            '<p class="important_number">' + features[0]*600 + ' sqm' + '</p>' +
+                            '<p class="alignleft">Nearby Retail:</p>' +
+                            '<p class="important_number">' + features[1]*10 + ' shops </p>' +
+                            '<p class="alignleft">Nearby Residential:</p>' +
+                            '<p class="important_number">' + features[3]*4 + ' dwellings' + '</p>' +
+                            '<p class="alignleft">Nearby Competitors:</p>' +
+                            '<p class="important_number">' + foursquare_places_found + '</p>';
 });
 
 function pedEstimate(features) {
-  return 100000000000
+  return features[0] * 2 + features[1]*4
 }
 
 function getBuildingsNear(center, radius) {
@@ -200,7 +380,7 @@ function getBuildingsNear(center, radius) {
 }
 
 function extractFeatures(point) {
-  var buildingsNear = getBuildingsNear(point, 0.1);
+  var buildingsNear = getBuildingsNear(point, 0.2);
   var featureVector = featureExtract(buildingsNear);
   // featureVector.unshift(point.properties.weekday_count);
   return featureVector;
@@ -227,18 +407,68 @@ function featureExtract(buildingsNear) {
   return featureVector;
 }
 
+foursquare_places_found = 0;
+
+// Use jQuery to make an AJAX request to Foursquare to load markers data.
+function countFoursquare(lat, lng){
+  api_endpoint_search = API_ENDPOINT_SEARCH.replace('CLIENT_ID', CLIENT_ID)
+                              .replace('CLIENT_SECRET', CLIENT_SECRET)
+                              .replace('LL', lat + ',' + lng);
+
+  $.getJSON(api_endpoint_search, function(result, status) {
+      if (status !== 'success') return alert('Request to Foursquare failed');
+      num_venues = result.response.venues.length
+
+      // clear features from fourSquare
+      var fourSquareSearched = {type: "FeatureCollection", features: []}
+
+      // Transform each venue result into a marker on the map.
+      for (var i = 0; i < result.response.venues.length; i++) {
+        var venue = result.response.venues[i];
+        var venue_feature = {
+          "type": "Feature",
+          "properties": {
+            "html": '<strong><a href="https://foursquare.com/v/' + venue.id + '">' + venue.name + '</a></strong>',
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [venue.location.lng, venue.location.lat]
+          }
+
+
+        };
+
+        fourSquareSearched.features.push(venue_feature);
+      }
+
+      foursquare_places_found = fourSquareSearched.features.length;
+      map.getSource('fourSquare').setData(fourSquareSearched);
+  });
+}
+
 map.on('click', function(e) {
-    var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
+    var features = map.queryRenderedFeatures(e.point, { layers: ['points', 'fourSquare_places'] });
 
     // If a feature was clicked, remove it from the map
     if (features.length) {
-        var id = features[0].properties.id;
-        geojson.features = geojson.features.filter(function(point) {
-            return point.properties.id !== id;
-        });
-        result.features = [];
-        map.getSource('geojson').setData(geojson);
-        map.getSource('circle').setData(result);
+        var layer = features[0].layer.id
+        if (layer == 'points') {
+          var id = features[0].properties.id;
+          geojson.features = geojson.features.filter(function(point) {
+              return point.properties.id !== id;
+          });
+          result.features = [];
+          map.getSource('geojson').setData(geojson);
+          map.getSource('circle').setData(result);
+          map.getSource('fourSquare').setData(fourSquare);
+        } else if (layer == 'fourSquare_places') {
+          feature = features[0]
+          var popup = new mapboxgl.Popup()
+            .setLngLat(map.unproject(e.point))
+            .setHTML(feature.properties.html)
+            .addTo(map);
+        }
+
     } else {
         geocoder.query([e.lngLat.lng, e.lngLat.lat])
     }
@@ -247,7 +477,7 @@ map.on('click', function(e) {
 // Use the same approach as above to indicate that the symbols are clickable
 // by changing the cursor style to 'pointer'.
 map.on('mousemove', function (e) {
-    var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
+    var features = map.queryRenderedFeatures(e.point, { layers: ['points', 'fourSquare_places'] });
     map.getCanvas().style.cursor = (features.length) ? 'pointer' : 'crosshair';
 });
 
