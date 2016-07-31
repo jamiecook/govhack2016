@@ -19,27 +19,32 @@
           min-width:33.3333%;
           margin-left:33.3333%;
         }
-        #important_number{
-          color: rgb(205, 45, 45);
-        }
     </style>
 </head>
 <body>
 
 <style>
+.important_number{
+  color: rgb(205, 45, 45);
+  text-align: center;
+}
 .coordinates {
-    background: rgba(0,0,0,0.7);
-    color: #fff;
+    background: rgba(179, 179, 179, 0.89);
     position: absolute;
     bottom: 10px;
     left: 10px;
     padding:5px 10px;
     margin: 0;
-    font-size: 12px;
-    line-height: 18px;
-    border-radius: 3px;
+    font-size: 18px;
+    border-radius: 20px;
+    border: 5px solid rgb(31, 31, 31);
     display: none;
+    width: 325px;
 }
+pre > p {
+  margin: 3px;
+}
+
 </style>
 
 <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.js'></script>
@@ -161,18 +166,22 @@ geocoder.on('result', function(ev) {
       }
     };
 
+    var features = extractFeatures(center)
+
     // Print the coordinates of where the point had
     // finished being dragged to on the map.
     coordinates.style.display = 'block';
     coordinates.innerHTML = '<p class="alignleft">Estimated Foot Traffic:</p>' +
-                            '<p class="aligncenter,important_number">' + points_within.features.length + '</p>' +
-                            '<p class="alignleft">Nearby offices:</p>' +
-                            '<p class="aligncenter">' + points_within.features.length + '</p>' +
-                            '<br />Nearby restaurants: ' + points_within.features.length +
-                            '<br />Nearby recommended restaurants: ' + points_within.features.length +
-                            '<br />Longitude: ' + coords[0] +
+                            '<p class="important_number">' + pedEstimate(features) + '</p>' +
+                            '<p class="alignleft">Nearby floors of office space:</p>' +
+                            '<p class="important_number">' + features[0] + '</p>' +
+                            'Longitude: ' + coords[0] +
                             '<br />Latitude: ' + coords[1];
 });
+
+function pedEstimate(features) {
+  return 100000000000
+}
 
 function getBuildingsNear(center, radius) {
   var steps = 20;
@@ -190,13 +199,15 @@ function getBuildingsNear(center, radius) {
 
 }
 
+function extractFeatures(point) {
+  var buildingsNear = getBuildingsNear(point, 0.1);
+  var featureVector = featureExtract(buildingsNear);
+  // featureVector.unshift(point.properties.weekday_count);
+  return featureVector;
+}
+
 function doFeatureExtraction() {
-  featureVectors = ped_counts.features.map(function(count) {
-    var buildingsNear = getBuildingsNear(count, 0.1);
-    var featureVector = featureExtract(buildingsNear);
-    featureVector.unshift(count.properties.weekday_count);
-    return featureVector;
-  })
+  featureVectors = ped_counts.features.map(extractFeatures)
   return featureVectors;
 }
 
