@@ -38,6 +38,7 @@
 <div id='map'></div>
 <pre id='coordinates' class='coordinates'></pre>
 <script src="buildings.geojson" type="text/javascript"></script>
+<script src="ped_counts.geojson" type="text/javascript"></script>
 
 <script>
 mapboxgl.accessToken = 'pk.eyJ1IjoibGF1cmVuY2VuaWNvbCIsImEiOiJjaW8zdWNwaW8wMWN1dzNramw2ZGVwZDIxIn0.ypTc0f_ote92hBKe3BzKuw';
@@ -102,14 +103,14 @@ map.on('load', function () {
     map.addLayer({
         "id": "melbourne-buildings",
         "type": "circle",
-        "source": "melbourne-buildings",    
+        "source": "melbourne-buildings",
         'paint': {
             // make circles larger as the user zooms from z12 to z22
             'circle-radius': {
                 'base': 1.75,
                 'stops': [[12, 2], [22, 180]]
             },
-            // color circles by ethnicity, using data-driven styles
+            // color circles by number of floors, using data-driven styles
             'circle-color': {
                 property: "Number of floors (above ground)",
                 stops: [[0, '#f1f075'], [50, '#e55e5e']]
@@ -138,27 +139,55 @@ geocoder.on('result', function(ev) {
       }
     };
 
-    var radius = 0.100;
-    var steps = 20;
-    var units = 'kilometers';
-
-    var circle = turf.circle(center, radius, steps, units);
-
-    var circle_collection = {type: "FeatureCollection", features: [circle]}
-
-    map.getSource('circle').setData(circle);
-
-    console.log(buildings)
-    console.log(circle)
-    var points_within = turf.within(buildings, circle_collection)
-
-    console.log(points_within.features.length);
+    console.log(JSON.stringify(getBuildingsNear(center, 0.100)));
 
     // Print the coordinates of where the point had
     // finished being dragged to on the map.
     coordinates.style.display = 'block';
     coordinates.innerHTML = 'Longitude: ' + coords[0] + '<br />Latitude: ' + coords[1];
 });
+
+function getBuildingsNear(center, radius) {
+  var steps = 20;
+  var units = 'kilometers';
+
+  var circle = turf.circle(center, radius, steps, units);
+
+  var circle_collection = {type: "FeatureCollection", features: [circle]}
+
+  map.getSource('circle').setData(circle);
+
+  var points_within = turf.within(buildings, circle_collection)
+
+  return points_within;
+
+}
+
+function doFeatureExtraction() {
+  featureVectors = ped_counts.features.map(function(count) {
+    var buildingsNear = getBuildingsNear(count, 0.1);
+    var featureVector = featureExtract(buildingsNear);
+    featureVector.unshift(count.properties.weekday_count);
+    return featureVector;
+  })
+  return featureVectors;
+}
+
+function getFloors(building) {
+  return building.properties['Number of floors (above ground)'];
+}
+
+var buildingTypes = ["Office", 'Retail - Shop', 'Student Accommodation',
+                     'Residential Apartment', 'Transport']
+function featureExtract(buildingsNear) {
+  var featureVector = buildingTypes.map(function(buildingType) {
+    var matched_buildings = buildingsNear.features.filter(function(b) {
+      return b.properties['Predominant space use'] == buildingType
+    });
+    return matched_buildings.map(getFloors).reduce((a,b) => a + b, 0.0)
+  });
+  return featureVector;
+}
 
 map.on('click', function(e) {
     var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
