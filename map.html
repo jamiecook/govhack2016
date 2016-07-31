@@ -343,7 +343,7 @@ geocoder.on('result', function(ev) {
     var features = extractFeatures(center);
     drawCircle(center);
 
-    console.log(features)
+    // console.log(features)
 
     // Print the coordinates of where the point had
     // finished being dragged to on the map.
@@ -357,7 +357,7 @@ geocoder.on('result', function(ev) {
                             '<p class="alignleft">Nearby Residential:</p>' +
                             '<p class="important_number">' + features[3]*4 + ' dwellings' + '</p>' +
                             '<p class="alignleft">Nearby Competitors:</p>' +
-                            '<p class="important_number">' + foursquare_places_found + '</p>';
+                            '<p class="important_number" id="foursquare_number">' + "..." + '</p>';
 });
 
 function pedEstimate(features) {
@@ -447,9 +447,11 @@ function countFoursquare(lat, lng){
         };
 
         fourSquareSearched.features.push(venue_feature);
+
       }
 
       foursquare_places_found = fourSquareSearched.features.length;
+      $("#foursquare_number").html(fourSquareSearched.features.length);
       map.getSource('fourSquare').setData(fourSquareSearched);
   });
 }
