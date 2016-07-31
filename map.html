@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset='utf-8' />
-    <title> Predict your pedestrian traffic | Pedestimate </title>
+    <title> Predict your pedestrian traffic | PedEstimate </title>
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.21.0/mapbox-gl.js'></script>
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.21.0/mapbox-gl.css' rel='stylesheet' />
@@ -340,7 +340,8 @@ geocoder.on('result', function(ev) {
       }
     };
 
-    var features = extractFeatures(center)
+    var features = extractFeatures(center);
+    drawCircle(center);
 
     console.log(features)
 
@@ -364,25 +365,32 @@ function pedEstimate(features) {
 }
 
 function getBuildingsNear(center, radius) {
-  var steps = 20;
-  var units = 'kilometers';
-
-  var circle = turf.circle(center, radius, steps, units);
-
-  var circle_collection = {type: "FeatureCollection", features: [circle]}
-
-  map.getSource('circle').setData(circle);
-
+  var circle_collection = {type: "FeatureCollection", features: [getCircle(center, radius)]}
   var points_within = turf.within(buildings, circle_collection)
 
   return points_within;
+}
 
+function drawCircle(center) {
+  var circle = getCircle(center, 0.2);
+  map.getSource('circle').setData(circle);
+}
+
+function getCircle(center, radius) {
+  var steps = 40;
+  var units = 'kilometers';
+  var circle = turf.circle(center, radius, steps, units);
+  return circle;
 }
 
 function extractFeatures(point) {
-  var buildingsNear = getBuildingsNear(point, 0.2);
-  var featureVector = featureExtract(buildingsNear);
-  // featureVector.unshift(point.properties.weekday_count);
+  var featureVector_100 = featureExtract(getBuildingsNear(point, 0.1));
+  var featureVector_200 = featureExtract(getBuildingsNear(point, 0.2));
+  var featureVector_300 = featureExtract(getBuildingsNear(point, 0.3));
+
+  // featureVector_100.unshift(point.properties.weekday_count);
+  var featureVector = featureVector_100.concat(featureVector_200).concat(featureVector_300);
+  //console.log(featureVector);
   return featureVector;
 }
 
