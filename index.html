@@ -2,27 +2,40 @@
 <html>
 <head>
     <meta charset='utf-8' />
-    <title></title>
+    <title> Predict your pedestrian traffic | Pedestimate </title>
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.21.0/mapbox-gl.js'></script>
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.21.0/mapbox-gl.css' rel='stylesheet' />
     <style>
         body { margin:0; padding:0; }
         #map { position:absolute; top:0; bottom:0; width:100%; }
+        #geocoder-container {
+          position:absolute;
+          top:0;
+          width:100%;
+          margin-top:10px;
+        }
+        #geocoder-container > div {
+          min-width:33.3333%;
+          margin-left:33.3333%;
+        }
+        #important_number{
+          color: rgb(205, 45, 45);
+        }
     </style>
 </head>
 <body>
 
 <style>
 .coordinates {
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.7);
     color: #fff;
     position: absolute;
     bottom: 10px;
     left: 10px;
     padding:5px 10px;
     margin: 0;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 18px;
     border-radius: 3px;
     display: none;
@@ -30,178 +43,201 @@
 </style>
 
 <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.js'></script>
+<script src="turf_SatJul302016.min.js" charset="utf-8"></script>
 <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.css' type='text/css' />
 
 <div id='map'></div>
+<div id='geocoder-container'></div>
 <pre id='coordinates' class='coordinates'></pre>
+<script src="buildings.geojson" type="text/javascript"></script>
+<script src="ped_counts.geojson" type="text/javascript"></script>
 
 <script>
 mapboxgl.accessToken = 'pk.eyJ1IjoibGF1cmVuY2VuaWNvbCIsImEiOiJjaW8zdWNwaW8wMWN1dzNramw2ZGVwZDIxIn0.ypTc0f_ote92hBKe3BzKuw';
 
-// Holds mousedown state for events. if this
-// flag is active, we move the point on `mousemove`.
-var isDragging;
-
-// Is the cursor over a point? if this
-// flag is active, we listen for a mousedown event.
-var isCursorOverPoint;
-
 var coordinates = document.getElementById('coordinates');
+
+// GeoJSON object to hold our measurement features
+var geojson = {
+    "type": "FeatureCollection",
+    "features": []
+};
+var result = {
+  "type": "FeatureCollection",
+  "features": []
+};
+
+var melbourne_location = [144.96546591, -37.8186610515]
 
 var map = new mapboxgl.Map({
     container: 'map', // container id
-    style: 'mapbox://styles/mapbox/streets-v9', //stylesheet location
-    center: [144.96546591, -37.8186610515], // starting position
+    style: 'mapbox://styles/mapbox/dark-v8', //stylesheet location
+    center: melbourne_location, // starting position
     zoom: 12 // starting zoom
 });
 
-var canvas = map.getCanvasContainer();
-
-function mouseDown() {
-    if (!isCursorOverPoint) return;
-
-    isDragging = true;
-
-    // Set a cursor indicator
-    canvas.style.cursor = 'grab';
-
-    // Mouse events
-    map.on('mousemove', onMove);
-    map.on('mouseup', onUp);
-}
-
-function onMove(e) {
-    if (!isDragging) return;
-    var coords = e.lngLat;
-
-    // Set a UI indicator for dragging.
-    canvas.style.cursor = 'grabbing';
-
-    // Update the Point feature in `geojson` coordinates
-    // and call setData to the source layer `point` on it.
-    var features = map.queryRenderedFeatures(e.point, { layers: ['point'] });
-
-    console.log(features)
-
-    features[0].geometry.coordinates = [coords.lng, coords.lat];
-    map.getSource('single-point').setData(features[0]);
-}
-
-function onUp(e) {
-    if (!isDragging) return;
-    var coords = e.lngLat;
-
-    // Print the coordinates of where the point had
-    // finished being dragged to on the map.
-    coordinates.style.display = 'block';
-    coordinates.innerHTML = 'Longitude: ' + coords.lng + '<br />Latitude: ' + coords.lat;
-    canvas.style.cursor = '';
-    isDragging = false;
-}
-
-
-var geocoder = new mapboxgl.Geocoder();
+var geocoder = new mapboxgl.Geocoder({
+  container: 'geocoder-container',
+  country: 'au',
+});
 map.addControl(geocoder);
 
+// Add zoom and rotation controls to the map.
+map.addControl(new mapboxgl.Navigation({position: 'top-left'}));
+
 map.on('load', function () {
-    map.addSource('melbourne-buildings', {
-        type: 'vector',
-        url: 'mapbox://laurencenicol.6m4w20qu'
+    map.addSource('circle', {
+        type: 'geojson',
+        data: result
     });
+    map.addLayer({
+        id: 'circle',
+        type: 'fill',
+        source: 'circle',
+        paint: {
+            'fill-antialias': true,
+            'fill-color': 'rgba(93, 171, 56, 0.2)',
+            'fill-outline-color': 'rgb(52, 96, 31)'
+        }
+    });
+
+    map.addSource('geojson', {
+        type: 'geojson',
+        data: geojson
+    });
+
+    // Add styles to the map
+    map.addLayer({
+        id: 'points',
+        type: 'circle',
+        source: 'geojson',
+        paint: {
+            'circle-radius': 5,
+            'circle-color': 'rgb(93, 171, 56)'
+        }
+    });
+
+    map.addSource("melbourne-buildings", {
+        type: "geojson",
+        data: buildings
+    });
+
     map.addLayer({
         "id": "melbourne-buildings",
         "type": "circle",
         "source": "melbourne-buildings",
-        "source-layer": "Building_information_2015_1-9pomst",
         'paint': {
             // make circles larger as the user zooms from z12 to z22
             'circle-radius': {
                 'base': 1.75,
                 'stops': [[12, 2], [22, 180]]
             },
-            // color circles by ethnicity, using data-driven styles
+            // color circles by number of floors, using data-driven styles
             'circle-color': {
                 property: "Number of floors (above ground)",
                 stops: [[0, '#f1f075'], [50, '#e55e5e']]
             }
         }
     });
-
-    map.addSource('single-point', {
-        "type": "geojson",
-        "data": {
-            "type": "FeatureCollection",
-            "features": []
-        }
-    });
-
-    map.addLayer({
-        "id": "point",
-        "source": "single-point",
-        "type": "circle",
-        "paint": {
-            "circle-radius": 10,
-            "circle-color": "#007cbf"
-        }
-    });
-
-    // Listen for the `geocoder.input` event that is triggered when a user
-    // makes a selection and add a symbol that matches the result.
-    geocoder.on('result', function(ev) {
-        map.getSource('single-point').setData(ev.result.geometry);
-    });
-
-    // If a feature is found on map movement,
-    // set a flag to permit a mousedown events.
-    map.on('mousemove', function(e) {
-        var features = map.queryRenderedFeatures(e.point, { layers: ['point'] });
-
-        // Change point and cursor style as a UI indicator
-        // and set a flag to enable other mouse events.
-        if (features.length) {
-            map.setPaintProperty('point', 'circle-color', '#3bb2d0');
-            canvas.style.cursor = 'move';
-            isCursorOverPoint = true;
-            map.dragPan.disable();
-        } else {
-            map.setPaintProperty('point', 'circle-color', '#3887be');
-            canvas.style.cursor = '';
-            isCursorOverPoint = false;
-            map.dragPan.enable();
-        }
-    });
-
-    // Set `true` to dispatch the event before other functions call it. This
-    // is necessary for disabling the default map dragging behaviour.
-    map.on('mousedown', mouseDown, true);
 });
 
-// When a click event occurs near a place, open a popup at the location of
-// the feature, with description HTML from its properties.
-map.on('click', function (e) {
-    var features = map.queryRenderedFeatures(e.point, { layers: ['melbourne-buildings'] });
+// Listen for the `geocoder.input` event that is triggered when a user
+// makes a selection and add a symbol that matches the result.
+geocoder.on('result', function(ev) {
+    if (geojson.features.length > 0) geojson.features.pop();
+    geojson.features.push(ev.result);
+    map.getSource('geojson').setData(geojson);
 
-    if (!features.length) {
-        return;
+    coords = ev.result.geometry.coordinates
+
+    var center = {
+      "type": "Feature",
+      "properties": {
+        "marker-color": "#0f0"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": coords
+      }
+    };
+
+    // Print the coordinates of where the point had
+    // finished being dragged to on the map.
+    coordinates.style.display = 'block';
+    coordinates.innerHTML = '<p class="alignleft">Estimated Foot Traffic:</p>' +
+                            '<p class="aligncenter,important_number">' + points_within.features.length + '</p>' +
+                            '<p class="alignleft">Nearby offices:</p>' +
+                            '<p class="aligncenter">' + points_within.features.length + '</p>' +
+                            '<br />Nearby restaurants: ' + points_within.features.length +
+                            '<br />Nearby recommended restaurants: ' + points_within.features.length +
+                            '<br />Longitude: ' + coords[0] +
+                            '<br />Latitude: ' + coords[1];
+});
+
+function getBuildingsNear(center, radius) {
+  var steps = 20;
+  var units = 'kilometers';
+
+  var circle = turf.circle(center, radius, steps, units);
+
+  var circle_collection = {type: "FeatureCollection", features: [circle]}
+
+  map.getSource('circle').setData(circle);
+
+  var points_within = turf.within(buildings, circle_collection)
+
+  return points_within;
+
+}
+
+function doFeatureExtraction() {
+  featureVectors = ped_counts.features.map(function(count) {
+    var buildingsNear = getBuildingsNear(count, 0.1);
+    var featureVector = featureExtract(buildingsNear);
+    featureVector.unshift(count.properties.weekday_count);
+    return featureVector;
+  })
+  return featureVectors;
+}
+
+function getFloors(building) {
+  return building.properties['Number of floors (above ground)'];
+}
+
+var buildingTypes = ["Office", 'Retail - Shop', 'Student Accommodation',
+                     'Residential Apartment', 'Transport']
+function featureExtract(buildingsNear) {
+  var featureVector = buildingTypes.map(function(buildingType) {
+    var matched_buildings = buildingsNear.features.filter(function(b) {
+      return b.properties['Predominant space use'] == buildingType
+    });
+    return matched_buildings.map(getFloors).reduce((a,b) => a + b, 0.0)
+  });
+  return featureVector;
+}
+
+map.on('click', function(e) {
+    var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
+
+    // If a feature was clicked, remove it from the map
+    if (features.length) {
+        var id = features[0].properties.id;
+        geojson.features = geojson.features.filter(function(point) {
+            return point.properties.id !== id;
+        });
+        result.features = [];
+        map.getSource('geojson').setData(geojson);
+        map.getSource('circle').setData(result);
+    } else {
+        geocoder.query([e.lngLat.lng, e.lngLat.lat])
     }
-
-    var feature = features[0];
-
-    console.log(feature)
-
-    // Populate the popup and set its coordinates
-    // based on the feature found.
-    var popup = new mapboxgl.Popup()
-        .setLngLat(feature.geometry.coordinates)
-        .setHTML(feature.properties["Number of floors (above ground)"])
-        .addTo(map);
 });
 
 // Use the same approach as above to indicate that the symbols are clickable
 // by changing the cursor style to 'pointer'.
 map.on('mousemove', function (e) {
-    var features = map.queryRenderedFeatures(e.point, { layers: ['melbourne-buildings'] });
-    map.getCanvas().style.cursor = (features.length) ? 'pointer' : '';
+    var features = map.queryRenderedFeatures(e.point, { layers: ['points'] });
+    map.getCanvas().style.cursor = (features.length) ? 'pointer' : 'crosshair';
 });
 
 </script>
