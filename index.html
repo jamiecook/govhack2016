@@ -2,40 +2,52 @@
 <html>
 <head>
     <meta charset='utf-8' />
-    <title></title>
+    <title> Predict your pedestrian traffic | Pedestimate </title>
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
     <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.21.0/mapbox-gl.js'></script>
     <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.21.0/mapbox-gl.css' rel='stylesheet' />
     <style>
         body { margin:0; padding:0; }
         #map { position:absolute; top:0; bottom:0; width:100%; }
+        #geocoder-container {
+          position:absolute;
+          top:0;
+          width:100%;
+          margin-top:10px;
+        }
+        #geocoder-container > div {
+          min-width:33.3333%;
+          margin-left:33.3333%;
+        }
+        #important_number{
+          color: rgb(205, 45, 45);
+        }
     </style>
 </head>
 <body>
 
 <style>
 .coordinates {
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.7);
     color: #fff;
     position: absolute;
     bottom: 10px;
     left: 10px;
     padding:5px 10px;
     margin: 0;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 18px;
     border-radius: 3px;
     display: none;
 }
 </style>
 
-
-
 <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.js'></script>
 <script src="turf_SatJul302016.min.js" charset="utf-8"></script>
 <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v1.3.0/mapbox-gl-geocoder.css' type='text/css' />
 
 <div id='map'></div>
+<div id='geocoder-container'></div>
 <pre id='coordinates' class='coordinates'></pre>
 <script src="buildings.geojson" type="text/javascript"></script>
 <script src="ped_counts.geojson" type="text/javascript"></script>
@@ -50,25 +62,30 @@ var geojson = {
     "type": "FeatureCollection",
     "features": []
 };
+var result = {
+  "type": "FeatureCollection",
+  "features": []
+};
+
+var melbourne_location = [144.96546591, -37.8186610515]
 
 var map = new mapboxgl.Map({
     container: 'map', // container id
-    style: 'mapbox://styles/mapbox/streets-v9', //stylesheet location
-    center: [144.96546591, -37.8186610515], // starting position
+    style: 'mapbox://styles/mapbox/dark-v8', //stylesheet location
+    center: melbourne_location, // starting position
     zoom: 12 // starting zoom
 });
 
-var geocoder = new mapboxgl.Geocoder();
+var geocoder = new mapboxgl.Geocoder({
+  container: 'geocoder-container',
+  country: 'au',
+});
 map.addControl(geocoder);
 
 // Add zoom and rotation controls to the map.
 map.addControl(new mapboxgl.Navigation({position: 'top-left'}));
 
 map.on('load', function () {
-    var result = {
-      "type": "FeatureCollection",
-      "features": []
-    };
     map.addSource('circle', {
         type: 'geojson',
         data: result
@@ -77,6 +94,11 @@ map.on('load', function () {
         id: 'circle',
         type: 'fill',
         source: 'circle',
+        paint: {
+            'fill-antialias': true,
+            'fill-color': 'rgba(93, 171, 56, 0.2)',
+            'fill-outline-color': 'rgb(52, 96, 31)'
+        }
     });
 
     map.addSource('geojson', {
@@ -91,7 +113,7 @@ map.on('load', function () {
         source: 'geojson',
         paint: {
             'circle-radius': 5,
-            'circle-color': '#007cbf'
+            'circle-color': 'rgb(93, 171, 56)'
         }
     });
 
@@ -139,12 +161,17 @@ geocoder.on('result', function(ev) {
       }
     };
 
-    console.log(JSON.stringify(getBuildingsNear(center, 0.100)));
-
     // Print the coordinates of where the point had
     // finished being dragged to on the map.
     coordinates.style.display = 'block';
-    coordinates.innerHTML = 'Longitude: ' + coords[0] + '<br />Latitude: ' + coords[1];
+    coordinates.innerHTML = '<p class="alignleft">Estimated Foot Traffic:</p>' +
+                            '<p class="aligncenter,important_number">' + points_within.features.length + '</p>' +
+                            '<p class="alignleft">Nearby offices:</p>' +
+                            '<p class="aligncenter">' + points_within.features.length + '</p>' +
+                            '<br />Nearby restaurants: ' + points_within.features.length +
+                            '<br />Nearby recommended restaurants: ' + points_within.features.length +
+                            '<br />Longitude: ' + coords[0] +
+                            '<br />Latitude: ' + coords[1];
 });
 
 function getBuildingsNear(center, radius) {
@@ -198,7 +225,9 @@ map.on('click', function(e) {
         geojson.features = geojson.features.filter(function(point) {
             return point.properties.id !== id;
         });
+        result.features = [];
         map.getSource('geojson').setData(geojson);
+        map.getSource('circle').setData(result);
     } else {
         geocoder.query([e.lngLat.lng, e.lngLat.lat])
     }
